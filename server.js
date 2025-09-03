@@ -20,6 +20,8 @@ app.use(
       'Origin',
       'Accept',
     ],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   })
 );
 
@@ -32,6 +34,16 @@ app.options('*', cors());
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   console.log('Headers:', req.headers);
+
+  // Set CORS headers for all requests
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, X-Requested-With, Origin, Accept'
+  );
+  res.header('Access-Control-Allow-Credentials', 'true');
+
   next();
 });
 
@@ -71,14 +83,6 @@ const transporter = nodemailer.createTransport({
 
 // Health check endpoint
 app.get('/', (req, res) => {
-  // Set CORS headers explicitly
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header(
-    'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, X-Requested-With, Origin, Accept'
-  );
-
   res.json({
     message: 'Kise API Service is running!',
     status: 'healthy',
@@ -89,14 +93,6 @@ app.get('/', (req, res) => {
 
 // Auth check endpoint
 app.post('/api/auth-check', async (req, res) => {
-  // Set CORS headers explicitly
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header(
-    'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, X-Requested-With, Origin, Accept'
-  );
-
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -119,14 +115,6 @@ app.post('/api/auth-check', async (req, res) => {
 
 // SSO token endpoint
 app.post('/api/sso-token', async (req, res) => {
-  // Set CORS headers explicitly
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header(
-    'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, X-Requested-With, Origin, Accept'
-  );
-
   try {
     const { uid, email, redirectUrl } = req.body;
     if (!uid || !email) {
@@ -292,7 +280,24 @@ app.options('*', (req, res) => {
     'Access-Control-Allow-Headers',
     'Content-Type, Authorization, X-Requested-With, Origin, Accept'
   );
+  res.header('Access-Control-Allow-Credentials', 'true');
   res.status(200).end();
+});
+
+// Error handling middleware with CORS headers
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+
+  // Ensure CORS headers are set even on errors
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, X-Requested-With, Origin, Accept'
+  );
+  res.header('Access-Control-Allow-Credentials', 'true');
+
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 module.exports = app;
