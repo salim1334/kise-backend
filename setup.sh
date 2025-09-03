@@ -1,0 +1,31 @@
+#!/bin/bash
+
+echo "🚀 Kise API Service Setup Script"
+echo "=================================="
+echo ""
+
+echo "📦 Installing dependencies..."
+npm install
+
+echo ""
+echo "✅ Setup complete!"
+echo ""
+echo "🚀 Next steps:"
+echo "1. Push to GitHub:"
+echo "   git init"
+echo "   git add ."
+echo "   git commit -m 'Initial Express.js API service setup'"
+echo "   git branch -M main"
+echo "   git remote add origin YOUR_GITHUB_REPO_URL"
+echo "   git push -u origin main"
+echo ""
+echo "2. Deploy on Render:"
+echo "   - Go to https://dashboard.render.com/"
+echo "   - Create new Web Service"
+echo "   - Connect your GitHub repo"
+echo "   - Set environment variables (see README.md)"
+echo ""
+echo "3. Update frontend URLs to use the new Render API service"
+echo ""
+echo "🎯 Your API service will solve the CORS issues!"
+echo "📖 See README.md and DEPLOYMENT_SUMMARY.md for details" 
