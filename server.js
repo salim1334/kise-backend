@@ -625,6 +625,94 @@ app.post('/api/check-email-new', async (req, res) => {
   }
 });
 
+// Verify email endpoint
+app.post('/api/verify-email', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ error: 'Token is required' });
+    }
+
+    // For demo purposes, we'll simulate token verification
+    // In production, you'd validate the token against your database
+    console.log('🔍 Verifying email token:', token);
+
+    // Simulate token validation (replace with actual logic)
+    if (token && token.length > 10) {
+      // Token looks valid
+      res.json({
+        success: true,
+        message: 'Email verified successfully',
+        verified: true,
+      });
+    } else {
+      res.status(400).json({
+        error: 'Invalid verification token',
+        verified: false,
+      });
+    }
+  } catch (error) {
+    console.error('Verify email error:', error);
+    res.status(500).json({ error: 'Failed to verify email' });
+  }
+});
+
+// Verify email new endpoint
+app.post('/api/verify-email-new', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ error: 'Token is required' });
+    }
+
+    console.log('🔍 Verifying new email token:', token);
+
+    if (token && token.length > 10) {
+      res.json({
+        success: true,
+        message: 'Email verified successfully',
+        verified: true,
+      });
+    } else {
+      res.status(400).json({
+        error: 'Invalid verification token',
+        verified: false,
+      });
+    }
+  } catch (error) {
+    console.error('Verify email new error:', error);
+    res.status(500).json({ error: 'Failed to verify email' });
+  }
+});
+
+// Verify email admin endpoint
+app.post('/api/verify-email-admin', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ error: 'Token is required' });
+    }
+
+    console.log('🔍 Verifying admin email token:', token);
+
+    if (token && token.length > 10) {
+      res.json({
+        success: true,
+        message: 'Admin email verified successfully',
+        verified: true,
+      });
+    } else {
+      res.status(400).json({
+        error: 'Invalid verification token',
+        verified: false,
+      });
+    }
+  } catch (error) {
+    console.error('Verify admin email error:', error);
+    res.status(500).json({ error: 'Failed to verify admin email' });
+  }
+});
+
 // Upload profile image endpoint (mock)
 app.post('/api/upload-profile-image', async (req, res) => {
   try {
@@ -742,6 +830,9 @@ app.listen(PORT, () => {
   console.log(`   - POST /api/share-notifications`);
   console.log(`   - POST /api/check-email`);
   console.log(`   - POST /api/check-email-new`);
+  console.log(`   - POST /api/verify-email`);
+  console.log(`   - POST /api/verify-email-new`);
+  console.log(`   - POST /api/verify-email-admin`);
   console.log(`   - POST /api/upload-profile-image`);
   console.log(`   - POST /api/upload-kyc-documents`);
   console.log(`   - POST /api/test-simple`);

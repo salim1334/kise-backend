@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KiseTrust API Service - All Endpoints Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #333;
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .endpoint-group {
+        margin-bottom: 30px;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: #fafafa;
+      }
+      .endpoint-group h3 {
+        color: #007bff;
+        margin-top: 0;
+      }
+      .endpoint {
+        margin: 15px 0;
+        padding: 15px;
+        background: white;
+        border-radius: 5px;
+        border-left: 4px solid #007bff;
+      }
+      .endpoint-name {
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 10px;
+      }
+      .endpoint-description {
+        color: #666;
+        margin-bottom: 10px;
+        font-size: 14px;
+      }
+      .test-button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 10px;
+      }
+      .test-button:hover {
+        background: #0056b3;
+      }
+      .test-button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      .result {
+        margin-top: 10px;
+        padding: 10px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 12px;
+        white-space: pre-wrap;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      .info {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+      }
+      .status {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 3px;
+        font-size: 12px;
+        font-weight: bold;
+        margin-left: 10px;
+      }
+      .status.pending {
+        background: #ffc107;
+        color: #212529;
+      }
+      .status.success {
+        background: #28a745;
+        color: white;
+      }
+      .status.error {
+        background: #dc3545;
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🧪 KiseTrust API Service - All Endpoints Test</h1>
+      <p>This page tests all available endpoints in your Render API service.</p>
+
+      <div class="endpoint-group">
+        <h3>🔐 Authentication & SSO</h3>
+
+        <div class="endpoint">
+          <div class="endpoint-name">POST /api/auth-check</div>
+          <div class="endpoint-description">
+            Check if a user is authenticated with a Firebase ID token
+          </div>
+          <button class="test-button" onclick="testAuthCheck()">
+            Test with Test Token
+          </button>
+          <button class="test-button" onclick="testAuthCheckValid()">
+            Test with Valid Token
+          </button>
+          <span class="status pending" id="auth-check-status">Pending</span>
+          <div class="result" id="auth-check-result"></div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-name">POST /api/sso-token</div>
+          <div class="endpoint-description">
+            Generate SSO token for cross-site authentication
+          </div>
+          <button class="test-button" onclick="testSsoToken()">
+            Test SSO Token
+          </button>
+          <span class="status pending" id="sso-token-status">Pending</span>
+          <div class="result" id="sso-token-result"></div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-name">POST /api/sso-token-for-sync</div>
+          <div class="endpoint-description">
+            Generate SSO token for session synchronization
+          </div>
+          <button class="test-button" onclick="testSsoTokenForSync()">
+            Test Sync Token
+          </button>
+          <span class="status pending" id="sso-token-sync-status">Pending</span>
+          <div class="result" id="sso-token-sync-result"></div>
+        </div>
+      </div>
+
+      <div class="endpoint-group">
+        <h3>📧 Email Services</h3>
+
+        <div class="endpoint">
+          <div class="endpoint-name">POST /api/send-verification-email</div>
+          <div class="endpoint-description">
+            Send email verification for new user registration
+          </div>
+          <button class="test-button" onclick="testSendVerificationEmail()">
+            Test Verification Email
+          </button>
+          <span class="status pending" id="verification-email-status"
+            >Pending</span
+          >
+          <div class="result" id="verification-email-result"></div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-name">POST /api/send-verification-email-new</div>
+          <div class="endpoint-description">
+            Send verification email for new user registration (new flow)
+          </div>
+          <button class="test-button" onclick="testSendVerificationEmailNew()">
+            Test New Verification Email
+          </button>
+          <span class="status pending" id="verification-email-new-status"
+            >Pending</span
+          >
+          <div class="result" id="verification-email-new-result"></div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-name">
+            POST /api/send-verification-email-admin
+          </div>
+          <div class="endpoint-description">
+            Send verification email for admin user registration
+          </div>
+          <button
+            class="test-button"
+            onclick="testSendVerificationEmailAdmin()"
+          >
+            Test Admin Verification Email
+          </button>
+          <span class="status pending" id="verification-email-admin-status"
+            >Pending</span
+          >
+          <div class="result" id="verification-email-admin-result"></div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-name">POST /api/send-password-reset</div>
+          <div class="endpoint-description">Send password reset email</div>
+          <button class="test-button" onclick="testSendPasswordReset()">
+            Test Password Reset
+          </button>
+          <span class="status pending" id="password-reset-status">Pending</span>
+          <div class="result" id="password-reset-result"></div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-name">POST /api/test-email</div>
+          <div class="endpoint-description">
+            Send a test email to verify email service
+          </div>
+          <input
+            type="email"
+            id="test-email-input"
+            placeholder="Enter email to test"
+            style="padding: 5px; margin-right: 10px"
+          />
+          <button class="test-button" onclick="testEmail()">
+            Test Email Service
+          </button>
+          <span class="status pending" id="test-email-status">Pending</span>
+          <div class="result" id="test-email-result"></div>
+        </div>
+      </div>
+
+      <div class="endpoint-group">
+        <h3>🔔 Notifications</h3>
+
+        <div class="endpoint">
+          <div class="endpoint-name">POST /api/kyc-notifications</div>
+          <div class="endpoint-description">
+            Send KYC notification emails (approved, rejected, additional info)
+          </div>
+          <button class="test-button" onclick="testKycNotification('approved')">
+            Test KYC Approved
+          </button>
+          <button class="test-button" onclick="testKycNotification('rejected')">
+            Test KYC Rejected
+          </button>
+          <button
+            class="test-button"
+            onclick="testKycNotification('additional_info')"
+          >
+            Test KYC Additional Info
+          </button>
+          <span class="status pending" id="kyc-notification-status"
+            >Pending</span
+          >
+          <div class="result" id="kyc-notification-result"></div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-name">POST /api/loan-notifications</div>
+          <div class="endpoint-description">
+            Send loan notification emails (submitted, approved, rejected,
+            disbursed)
+          </div>
+          <button
+            class="test-button"
+            onclick="testLoanNotification('submitted')"
+          >
+            Test Loan Submitted
+          </button>
+          <button
+            class="test-button"
+            onclick="testLoanNotification('approved')"
+          >
+            Test Loan Approved
+          </button>
+          <button
+            class="test-button"
+            onclick="testLoanNotification('rejected')"
+          >
+            Test Loan Rejected
+          </button>
+          <button
+            class="test-button"
+            onclick="testLoanNotification('disbursed')"
+          >
+            Test Loan Disbursed
+          </button>
+          <span class="status pending" id="loan-notification-status"
+            >Pending</span
+          >
+          <div class="result" id="loan-notification-result"></div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-name">POST /api/share-notifications</div>
+          <div class="endpoint-description">
+            Send share-related notifications
+          </div>
+          <button class="test-button" onclick="testShareNotification()">
+            Test Share Notification
+          </button>
+          <span class="status pending" id="share-notification-status"
+            >Pending</span
+          >
+          <div class="result" id="share-notification-result"></div>
+        </div>
+      </div>
+
+      <div class="endpoint-group">
+        <h3>🔍 Utility Services</h3>
+
+        <div class="endpoint">
+          <div class="endpoint-name">POST /api/check-email</div>
+          <div class="endpoint-description">
+            Check if an email exists in the system
+          </div>
+          <button class="test-button" onclick="testCheckEmail()">
+            Test Email Check
+          </button>
+          <span class="status pending" id="check-email-status">Pending</span>
+          <div class="result" id="check-email-result"></div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-name">POST /api/check-email-new</div>
+          <div class="endpoint-description">
+            Check if an email is available for new registration
+          </div>
+          <button class="test-button" onclick="testCheckEmailNew()">
+            Test New Email Check
+          </button>
+          <span class="status pending" id="check-email-new-status"
+            >Pending</span
+          >
+          <div class="result" id="check-email-new-result"></div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-name">POST /api/upload-profile-image</div>
+          <div class="endpoint-description">
+            Upload user profile image (mock endpoint)
+          </div>
+          <button class="test-button" onclick="testUploadProfileImage()">
+            Test Profile Image Upload
+          </button>
+          <span class="status pending" id="upload-profile-image-status"
+            >Pending</span
+          >
+          <div class="result" id="upload-profile-image-result"></div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-name">POST /api/upload-kyc-documents</div>
+          <div class="endpoint-description">
+            Upload KYC documents (mock endpoint)
+          </div>
+          <button class="test-button" onclick="testUploadKYCDocuments()">
+            Test KYC Documents Upload
+          </button>
+          <span class="status pending" id="upload-kyc-documents-status"
+            >Pending</span
+          >
+          <div class="result" id="upload-kyc-documents-result"></div>
+        </div>
+      </div>
+
+      <div class="endpoint-group">
+        <h3>🧪 Test Endpoints</h3>
+
+        <div class="endpoint">
+          <div class="endpoint-name">POST /api/test-simple</div>
+          <div class="endpoint-description">
+            Simple test endpoint to verify API is working
+          </div>
+          <button class="test-button" onclick="testSimple()">
+            Test Simple
+          </button>
+          <span class="status pending" id="test-simple-status">Pending</span>
+          <div class="result" id="test-simple-result"></div>
+        </div>
+
+        <div class="endpoint">
+          <div class="endpoint-name">POST /api/test-upload</div>
+          <div class="endpoint-description">Test upload functionality</div>
+          <button class="test-button" onclick="testUpload()">
+            Test Upload
+          </button>
+          <span class="status pending" id="test-upload-status">Pending</span>
+          <div class="result" id="test-upload-result"></div>
+        </div>
+      </div>
+
+      <div class="endpoint-group">
+        <h3>📊 Test All Endpoints</h3>
+        <button
+          class="test-button"
+          onclick="testAllEndpoints()"
+          style="background: #28a745; font-size: 16px; padding: 12px 24px"
+        >
+          🚀 Test All Endpoints
+        </button>
+        <div class="result" id="all-endpoints-result"></div>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = 'https://kise-api-service1.onrender.com';
+
+      function updateStatus(endpointId, status, className) {
+        const statusElement = document.getElementById(`${endpointId}-status`);
+        statusElement.textContent = status;
+        statusElement.className = `status ${className}`;
+      }
+
+      function updateResult(endpointId, result, isError = false) {
+        const resultElement = document.getElementById(`${endpointId}-result`);
+        resultElement.textContent = JSON.stringify(result, null, 2);
+        resultElement.className = `result ${isError ? 'error' : 'success'}`;
+      }
+
+      async function testEndpoint(endpoint, method = 'POST', body = null) {
+        try {
+          updateStatus(endpoint, 'Pending', 'pending');
+
+          const options = {
+            method,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          };
+
+          if (body) {
+            options.body = JSON.stringify(body);
+          }
+
+          const response = await fetch(`${API_BASE}${endpoint}`, options);
+          const data = await response.json();
+
+          if (response.ok) {
+            updateStatus(endpoint, 'Success', 'success');
+            updateResult(endpoint, { status: response.status, data });
+          } else {
+            updateStatus(endpoint, 'Error', 'error');
+            updateResult(
+              endpoint,
+              { status: response.status, error: data },
+              true
+            );
+          }
+        } catch (error) {
+          updateStatus(endpoint, 'Error', 'error');
+          updateResult(endpoint, { error: error.message }, true);
+        }
+      }
+
+      // Authentication & SSO Tests
+      function testAuthCheck() {
+        testEndpoint('/api/auth-check', 'POST', { token: 'test-token-123' });
+      }
+
+      function testAuthCheckValid() {
+        testEndpoint('/api/auth-check', 'POST', {
+          token: 'valid-firebase-token',
+        });
+      }
+
+      function testSsoToken() {
+        testEndpoint('/api/sso-token', 'POST', {
+          uid: 'test-user-123',
+          email: 'test@example.com',
+          redirectUrl: 'https://example.com/dashboard',
+        });
+      }
+
+      function testSsoTokenForSync() {
+        testEndpoint('/api/sso-token-for-sync', 'POST', {
+          uid: 'test-user-123',
+          email: 'test@example.com',
+          site: 'main',
+        });
+      }
+
+      // Email Service Tests
+      function testSendVerificationEmail() {
+        testEndpoint('/api/send-verification-email', 'POST', {
+          email: 'test@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          password: 'password123',
+          userData: { role: 'user' },
+        });
+      }
+
+      function testSendVerificationEmailNew() {
+        testEndpoint('/api/send-verification-email-new', 'POST', {
+          email: 'newuser@example.com',
+          firstName: 'Jane',
+          lastName: 'Smith',
+          password: 'password123',
+          userData: { role: 'user' },
+        });
+      }
+
+      function testSendVerificationEmailAdmin() {
+        testEndpoint('/api/send-verification-email-admin', 'POST', {
+          email: 'admin@example.com',
+          firstName: 'Admin',
+          lastName: 'User',
+          password: 'admin123',
+          role: 'admin',
+          adminKey: 'kise-admin-secret',
+          userData: { role: 'admin' },
+        });
+      }
+
+      function testSendPasswordReset() {
+        testEndpoint('/api/send-password-reset', 'POST', {
+          email: 'test@example.com',
+        });
+      }
+
+      function testEmail() {
+        const email = document.getElementById('test-email-input').value;
+        if (!email) {
+          alert('Please enter an email address');
+          return;
+        }
+        testEndpoint('/api/test-email', 'POST', { email });
+      }
+
+      // Notification Tests
+      function testKycNotification(type) {
+        testEndpoint('/api/kyc-notifications', 'POST', {
+          type,
+          userId: 'test-user-123',
+          reviewNotes:
+            type === 'rejected'
+              ? 'Document quality too low'
+              : type === 'additional_info'
+              ? 'Need additional proof of address'
+              : '',
+        });
+      }
+
+      function testLoanNotification(type) {
+        testEndpoint('/api/loan-notifications', 'POST', {
+          type,
+          applicationId: 'loan-123',
+          userId: 'test-user-123',
+          reviewNotes: type === 'rejected' ? 'Income verification failed' : '',
+        });
+      }
+
+      function testShareNotification() {
+        testEndpoint('/api/share-notifications', 'POST', {
+          userId: 'test-user-123',
+          shareId: 'share-456',
+          action: 'purchased',
+        });
+      }
+
+      // Utility Service Tests
+      function testCheckEmail() {
+        testEndpoint('/api/check-email', 'POST', {
+          email: 'existing@example.com',
+        });
+      }
+
+      function testCheckEmailNew() {
+        testEndpoint('/api/check-email-new', 'POST', {
+          email: 'new@example.com',
+        });
+      }
+
+      function testUploadProfileImage() {
+        testEndpoint('/api/upload-profile-image', 'POST', {
+          userId: 'test-user-123',
+          imageData: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ...',
+        });
+      }
+
+      function testUploadKYCDocuments() {
+        testEndpoint('/api/upload-kyc-documents', 'POST', {
+          userId: 'test-user-123',
+          documents: [
+            { type: 'id_card', filename: 'id_card.jpg' },
+            { type: 'proof_of_address', filename: 'address.pdf' },
+          ],
+        });
+      }
+
+      // Test Endpoint Tests
+      function testSimple() {
+        testEndpoint('/api/test-simple', 'POST');
+      }
+
+      function testUpload() {
+        testEndpoint('/api/test-upload', 'POST');
+      }
+
+      // Test All Endpoints
+      async function testAllEndpoints() {
+        const resultElement = document.getElementById('all-endpoints-result');
+        resultElement.textContent = 'Testing all endpoints...';
+        resultElement.className = 'result info';
+
+        const endpoints = [
+          { path: '/api/test-simple', method: 'POST' },
+          { path: '/api/test-upload', method: 'POST' },
+          {
+            path: '/api/check-email',
+            method: 'POST',
+            body: { email: 'test@example.com' },
+          },
+          {
+            path: '/api/check-email-new',
+            method: 'POST',
+            body: { email: 'new@example.com' },
+          },
+          {
+            path: '/api/share-notifications',
+            method: 'POST',
+            body: { userId: 'test', shareId: 'test', action: 'test' },
+          },
+        ];
+
+        const results = [];
+
+        for (const endpoint of endpoints) {
+          try {
+            const options = {
+              method: endpoint.method,
+              headers: { 'Content-Type': 'application/json' },
+            };
+
+            if (endpoint.body) {
+              options.body = JSON.stringify(endpoint.body);
+            }
+
+            const response = await fetch(
+              `${API_BASE}${endpoint.path}`,
+              options
+            );
+            const data = await response.json();
+
+            results.push({
+              endpoint: endpoint.path,
+              status: response.status,
+              success: response.ok,
+              data,
+            });
+          } catch (error) {
+            results.push({
+              endpoint: endpoint.path,
+              status: 'ERROR',
+              success: false,
+              error: error.message,
+            });
+          }
+        }
+
+        const successCount = results.filter((r) => r.success).length;
+        const totalCount = results.length;
+
+        resultElement.textContent = `✅ Test Complete!\n\nSuccess: ${successCount}/${totalCount}\n\nResults:\n${JSON.stringify(
+          results,
+          null,
+          2
+        )}`;
+        resultElement.className = `result ${
+          successCount === totalCount ? 'success' : 'error'
+        }`;
+      }
+
+      // Test health check on page load
+      window.addEventListener('load', async () => {
+        try {
+          const response = await fetch(`${API_BASE}/`);
+          if (response.ok) {
+            console.log('✅ API Service is running and accessible');
+          }
+        } catch (error) {
+          console.error('❌ API Service is not accessible:', error);
+        }
+      });
+    </script>
+  </body>
+</html>

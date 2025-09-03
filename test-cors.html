@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CORS Test - Kise API Service</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .test-section {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      .success {
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+        color: #155724;
+      }
+      .error {
+        background-color: #f8d7da;
+        border-color: #f5c6cb;
+        color: #721c24;
+      }
+      button {
+        padding: 10px 20px;
+        margin: 5px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      .result {
+        margin-top: 10px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 3px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🧪 CORS Test - Kise API Service</h1>
+    <p>
+      Testing your deployed API service at:
+      <strong>https://kise-api-service1.onrender.com</strong>
+    </p>
+
+    <div class="test-section">
+      <h3>1. Health Check Test</h3>
+      <button onclick="testHealthCheck()">Test Health Check</button>
+      <div id="health-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+      <h3>2. SSO Token Test (Your Main Issue!)</h3>
+      <button onclick="testSsoToken()">Test SSO Token</button>
+      <div id="sso-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+      <h3>3. Auth Check Test</h3>
+      <button onclick="testAuthCheck()">Test Auth Check</button>
+      <div id="auth-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+      <h3>4. CORS Preflight Test</h3>
+      <button onclick="testCorsPreflight()">Test CORS Preflight</button>
+      <div id="cors-result" class="result"></div>
+    </div>
+
+    <script>
+      const API_BASE = 'https://kise-api-service1.onrender.com';
+
+      async function testHealthCheck() {
+        const resultDiv = document.getElementById('health-result');
+        resultDiv.textContent = 'Testing...';
+
+        try {
+          const response = await fetch(`${API_BASE}/`);
+          const data = await response.json();
+          resultDiv.textContent = `✅ SUCCESS!\nStatus: ${
+            response.status
+          }\nResponse: ${JSON.stringify(data, null, 2)}`;
+          resultDiv.className = 'result success';
+        } catch (error) {
+          resultDiv.textContent = `❌ ERROR!\n${error.message}`;
+          resultDiv.className = 'result error';
+        }
+      }
+
+      async function testSsoToken() {
+        const resultDiv = document.getElementById('sso-result');
+        resultDiv.textContent = 'Testing...';
+
+        try {
+          const response = await fetch(`${API_BASE}/api/sso-token`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              uid: 'test-user-123',
+              email: 'test@example.com',
+              redirectUrl: 'https://kise-test.web.app/dashboard',
+            }),
+          });
+
+          const data = await response.json();
+          resultDiv.textContent = `✅ SUCCESS!\nStatus: ${
+            response.status
+          }\nResponse: ${JSON.stringify(data, null, 2)}`;
+          resultDiv.className = 'result success';
+        } catch (error) {
+          resultDiv.textContent = `❌ ERROR!\n${error.message}`;
+          resultDiv.className = 'result error';
+        }
+      }
+
+      async function testAuthCheck() {
+        const resultDiv = document.getElementById('auth-result');
+        resultDiv.textContent = 'Testing...';
+
+        try {
+          const response = await fetch(`${API_BASE}/api/auth-check`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: 'Bearer test-token-123',
+            },
+          });
+
+          const data = await response.json();
+          resultDiv.textContent = `✅ SUCCESS!\nStatus: ${
+            response.status
+          }\nResponse: ${JSON.stringify(data, null, 2)}`;
+          resultDiv.className = 'result success';
+        } catch (error) {
+          resultDiv.textContent = `❌ ERROR!\n${error.message}`;
+          resultDiv.className = 'result error';
+        }
+      }
+
+      async function testCorsPreflight() {
+        const resultDiv = document.getElementById('cors-result');
+        resultDiv.textContent = 'Testing...';
+
+        try {
+          // Test OPTIONS request (CORS preflight)
+          const response = await fetch(`${API_BASE}/api/sso-token`, {
+            method: 'OPTIONS',
+            headers: {
+              Origin: 'https://kise-test.web.app',
+              'Access-Control-Request-Method': 'POST',
+              'Access-Control-Request-Headers': 'Content-Type',
+            },
+          });
+
+          const corsHeaders = {
+            'Access-Control-Allow-Origin': response.headers.get(
+              'Access-Control-Allow-Origin'
+            ),
+            'Access-Control-Allow-Methods': response.headers.get(
+              'Access-Control-Allow-Methods'
+            ),
+            'Access-Control-Allow-Headers': response.headers.get(
+              'Access-Control-Allow-Headers'
+            ),
+            'Access-Control-Allow-Credentials': response.headers.get(
+              'Access-Control-Allow-Credentials'
+            ),
+          };
+
+          resultDiv.textContent = `✅ CORS Preflight SUCCESS!\nStatus: ${
+            response.status
+          }\nCORS Headers: ${JSON.stringify(corsHeaders, null, 2)}`;
+          resultDiv.className = 'result success';
+        } catch (error) {
+          resultDiv.textContent = `❌ CORS Preflight ERROR!\n${error.message}`;
+          resultDiv.className = 'result error';
+        }
+      }
+    </script>
+  </body>
+</html>
