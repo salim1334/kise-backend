@@ -7,40 +7,54 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS configuration
-app.use(cors({
-  origin: [
-    'https://kise-test.web.app',
-    'https://kise-test.firebaseapp.com',
-    'https://kise-test-39ea0.web.app',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:9002'
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
+// CORS configuration - Allow all origins for now
+app.use(
+  cors({
+    origin: true, // Allow all origins
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Origin',
+      'Accept',
+    ],
+  })
+);
 
 app.use(express.json());
 
+// Handle CORS preflight requests
+app.options('*', cors());
+
+// Debug middleware - log all requests
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  console.log('Headers:', req.headers);
+  next();
+});
+
 // Initialize Firebase Admin
 const serviceAccount = {
-  type: "service_account",
-  project_id: process.env.FIREBASE_PROJECT_ID || "kise-test",
+  type: 'service_account',
+  project_id: process.env.FIREBASE_PROJECT_ID || 'kise-test',
   private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
   private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
   client_email: process.env.FIREBASE_CLIENT_EMAIL,
   client_id: process.env.FIREBASE_CLIENT_ID,
-  auth_uri: "https://accounts.google.com/o/oauth2/auth",
-  token_uri: "https://oauth2.googleapis.com/token",
-  auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-  client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL
+  auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+  token_uri: 'https://oauth2.googleapis.com/token',
+  auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+  client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,
 };
 
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
-    databaseURL: `https://${process.env.FIREBASE_PROJECT_ID || 'kise-test'}.firebaseio.com`
+    databaseURL: `https://${
+      process.env.FIREBASE_PROJECT_ID || 'kise-test'
+    }.firebaseio.com`,
   });
 }
 
@@ -57,15 +71,32 @@ const transporter = nodemailer.createTransporter({
 
 // Health check endpoint
 app.get('/', (req, res) => {
-  res.json({ 
+  // Set CORS headers explicitly
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, X-Requested-With, Origin, Accept'
+  );
+
+  res.json({
     message: 'Kise API Service is running!',
     status: 'healthy',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    cors: 'enabled for all origins',
   });
 });
 
 // Auth check endpoint
 app.post('/api/auth-check', async (req, res) => {
+  // Set CORS headers explicitly
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, X-Requested-With, Origin, Accept'
+  );
+
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -88,6 +119,14 @@ app.post('/api/auth-check', async (req, res) => {
 
 // SSO token endpoint
 app.post('/api/sso-token', async (req, res) => {
+  // Set CORS headers explicitly
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, X-Requested-With, Origin, Accept'
+  );
+
   try {
     const { uid, email, redirectUrl } = req.body;
     if (!uid || !email) {
@@ -144,8 +183,10 @@ app.post('/api/send-verification-email', async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    const verificationLink = await admin.auth().generateEmailVerificationLink(email);
-    
+    const verificationLink = await admin
+      .auth()
+      .generateEmailVerificationLink(email);
+
     const emailTemplate = {
       from: 'seadahassen459@gmail.com',
       to: email,
@@ -166,7 +207,7 @@ app.post('/api/send-verification-email', async (req, res) => {
 
     const info = await transporter.sendMail(emailTemplate);
     console.log('Verification email sent:', info.messageId);
-    
+
     res.json({
       success: true,
       message: 'Verification email sent successfully',
@@ -187,7 +228,7 @@ app.post('/api/send-password-reset', async (req, res) => {
     }
 
     const resetLink = await admin.auth().generatePasswordResetLink(email);
-    
+
     const emailTemplate = {
       from: 'seadahassen459@gmail.com',
       to: email,
@@ -209,7 +250,7 @@ app.post('/api/send-password-reset', async (req, res) => {
 
     const info = await transporter.sendMail(emailTemplate);
     console.log('Password reset email sent:', info.messageId);
-    
+
     res.json({
       success: true,
       message: 'Password reset email sent successfully',
@@ -239,7 +280,19 @@ app.post('/api/share-notifications', async (req, res) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Kise API Service running on port ${PORT}`);
-  console.log(`📡 CORS enabled for: ${app.get('cors').origin.join(', ')}`);
+  console.log(`📡 CORS enabled for all origins`);
+  console.log(`🔗 Test URL: http://localhost:${PORT}`);
 });
 
-module.exports = app; 
+// Catch-all OPTIONS handler for CORS
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, X-Requested-With, Origin, Accept'
+  );
+  res.status(200).end();
+});
+
+module.exports = app;
