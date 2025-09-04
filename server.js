@@ -262,6 +262,86 @@ async function sendLoanNotificationEmail(
   });
 }
 
+// Helper function to send welcome email
+async function sendWelcomeEmail(email, firstName) {
+  const emailTemplate = {
+    from: 'seadahassen459@gmail.com',
+    to: email,
+    subject: '🎉 Welcome to KiseTrust Express!',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="margin: 0; font-size: 28px;">🎉 Welcome to KiseTrust Express!</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px;">Your account has been successfully verified</p>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+          <h2 style="color: #333; margin-top: 0;">Hello ${firstName}!</h2>
+          
+          <p style="color: #555; line-height: 1.6;">
+            Welcome to KiseTrust Express! Your account has been successfully created and verified. 
+            You now have access to all our financial services.
+          </p>
+          
+          <div style="background: #e8f5e8; border: 1px solid #4caf50; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #2e7d32; margin-top: 0;">✅ What's Next?</h3>
+            <ul style="color: #2e7d32; line-height: 1.6;">
+              <li>Complete your KYC verification</li>
+              <li>Explore our investment opportunities</li>
+              <li>Apply for loans and financial services</li>
+              <li>Set up your payment preferences</li>
+            </ul>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://kise-test.web.app/dashboard" style="background: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; display: inline-block; font-weight: bold;">
+              🚀 Go to Dashboard
+            </a>
+          </div>
+          
+          <p style="color: #666; font-size: 14px; text-align: center;">
+            If you have any questions, please don't hesitate to contact our support team.
+          </p>
+          
+          <p style="color: #333; margin-top: 30px;">
+            Best regards,<br>
+            <strong>The KiseTrust Express Team</strong>
+          </p>
+        </div>
+        
+        <div style="text-align: center; margin-top: 20px; color: #666; font-size: 12px;">
+          <p>© 2024 KiseTrust Express. All rights reserved.</p>
+        </div>
+      </div>
+    `,
+    text: `
+Welcome to KiseTrust Express!
+
+Hello ${firstName},
+
+Welcome to KiseTrust Express! Your account has been successfully created and verified. 
+You now have access to all our financial services.
+
+What's Next?
+- Complete your KYC verification
+- Explore our investment opportunities  
+- Apply for loans and financial services
+- Set up your payment preferences
+
+Go to Dashboard: https://kise-test.web.app/dashboard
+
+If you have any questions, please don't hesitate to contact our support team.
+
+Best regards,
+The KiseTrust Express Team
+
+© 2024 KiseTrust Express. All rights reserved.
+    `,
+  };
+
+  return await transporter.sendMail(emailTemplate);
+}
+
 // Health check endpoint
 app.get('/', (req, res) => {
   res.json({
@@ -344,7 +424,10 @@ app.post('/api/sso-token-for-sync', async (req, res) => {
   }
 });
 
-// Send verification email endpoint (enhanced)
+// In-memory store for verification tokens
+const verificationTokens = new Map();
+
+// Send verification email endpoint
 app.post('/api/send-verification-email', async (req, res) => {
   try {
     const { email, firstName, lastName, password, userData } = req.body;
@@ -361,6 +444,13 @@ app.post('/api/send-verification-email', async (req, res) => {
     const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL || 'https://kise-test.web.app';
     const verificationUrl = `${baseUrl}/verify-email?token=${token}`;
+
+    // Store the user's data with the token (including userData)
+    const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24-hour expiration
+    verificationTokens.set(token, {
+      userData: { email, firstName, lastName, password, ...userData },
+      expiresAt,
+    });
 
     // Send verification email
     await sendVerificationEmail(email, firstName, verificationUrl);
@@ -633,27 +723,173 @@ app.post('/api/verify-email', async (req, res) => {
       return res.status(400).json({ error: 'Token is required' });
     }
 
-    // For demo purposes, we'll simulate token verification
-    // In production, you'd validate the token against your database
-    console.log('🔍 Verifying email token:', token);
+    const verificationData = verificationTokens.get(token);
 
-    // Simulate token validation (replace with actual logic)
-    if (token && token.length > 10) {
-      // Token looks valid
-      res.json({
+    if (!verificationData) {
+      return res.status(400).json({ error: 'Invalid verification token' });
+    }
+
+    if (Date.now() > verificationData.expiresAt) {
+      verificationTokens.delete(token);
+      return res.status(400).json({ error: 'token_expired' });
+    }
+
+    const { email, firstName, lastName, password, phone, acceptMarketing } =
+      verificationData.userData;
+
+    try {
+      // Create Firebase Auth user
+      const userRecord = await admin.auth().createUser({
+        email,
+        password,
+        displayName: `${firstName} ${lastName}`,
+      });
+
+      console.log(
+        '✅ Firebase Auth user created successfully on backend. UID:',
+        userRecord.uid
+      );
+
+      // Create Firestore user document
+      const db = admin.firestore();
+      const userDoc = {
+        id: userRecord.uid,
+        email: userRecord.email,
+        firstName: firstName,
+        lastName: lastName,
+        phone: phone || '',
+        dateOfBirth: '',
+        address: {
+          street: '',
+          city: '',
+          state: '',
+          postalCode: '',
+          country: '',
+        },
+        kycStatus: 'incomplete',
+        role: 'customer',
+        kyc: {
+          personal: {
+            gender: null,
+            nationality: '',
+          },
+          employment: {
+            status: '',
+            employerName: '',
+            jobTitle: '',
+            monthlyIncome: 0,
+            incomeSource: '',
+          },
+          financial: {
+            bankName: '',
+            accountNumber: '',
+            accountType: '',
+          },
+          documents: [],
+        },
+        accountStatus: 'active',
+        emailVerified: true,
+        phoneVerified: false,
+        preferences: {
+          language: 'en',
+          currency: 'ETB',
+          notifications: {
+            email: true,
+            sms: true,
+            push: true,
+            marketing: acceptMarketing || false,
+          },
+        },
+        security: {
+          twoFactorEnabled: false,
+          loginAttempts: 0,
+        },
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      // Save user document to Firestore
+      await db.collection('users').doc(userRecord.uid).set(userDoc);
+      console.log('✅ Firestore user document created successfully');
+
+      // Send welcome email
+      try {
+        await sendWelcomeEmail(email, firstName);
+        console.log('✅ Welcome email sent successfully');
+      } catch (emailError) {
+        console.warn('⚠️ Welcome email failed:', emailError.message);
+        // Don't fail the registration if email fails
+      }
+
+      // Clean up the verification token
+      verificationTokens.delete(token);
+
+      // Construct the response payload
+      const responsePayload = {
         success: true,
-        message: 'Email verified successfully',
         verified: true,
-      });
-    } else {
-      res.status(400).json({
-        error: 'Invalid verification token',
-        verified: false,
-      });
+        message:
+          'Email verified, user created, and welcome email sent successfully',
+        user: {
+          uid: userRecord.uid,
+          email: userRecord.email,
+          firstName: firstName,
+          lastName: lastName,
+        },
+      };
+
+      console.log(
+        '📦 Sending successful response payload to frontend:',
+        JSON.stringify(responsePayload, null, 2)
+      );
+
+      // Return the new user's data to the frontend
+      return res.json(responsePayload);
+    } catch (firebaseError) {
+      verificationTokens.delete(token);
+      if (firebaseError.code === 'auth/email-already-exists') {
+        return res
+          .status(409)
+          .json({ error: 'This email is already registered.' });
+      }
+      console.error('❌ Firebase error during user creation:', firebaseError);
+      console.error('❌ Firebase error code:', firebaseError.code);
+      console.error('❌ Firebase error message:', firebaseError.message);
+      return res.status(500).json({ error: 'Failed to create account.' });
     }
   } catch (error) {
-    console.error('Verify email error:', error);
+    console.error('❌ Top-level verify email error:', error);
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error stack:', error.stack);
     res.status(500).json({ error: 'Failed to verify email' });
+  }
+});
+
+// Send welcome email endpoint (called after successful user creation)
+app.post('/api/send-welcome-email', async (req, res) => {
+  try {
+    const { email, firstName } = req.body;
+
+    if (!email || !firstName) {
+      return res
+        .status(400)
+        .json({ error: 'Email and firstName are required' });
+    }
+
+    console.log('📧 Sending welcome email to:', email);
+
+    // Send welcome email
+    await sendWelcomeEmail(email, firstName);
+
+    res.json({
+      success: true,
+      message: 'Welcome email sent successfully',
+      email,
+      firstName,
+    });
+  } catch (error) {
+    console.error('Send welcome email error:', error);
+    res.status(500).json({ error: 'Failed to send welcome email' });
   }
 });
 

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Registration</title>
+</head>
+<body>
+    <h1>Test Registration</h1>
+    <button onclick="testRegistration()">Test Registration</button>
+    <div id="result"></div>
+
+    <script>
+        async function testRegistration() {
+            const testData = {
+                email: "test@example.com",
+                firstName: "John",
+                lastName: "Doe",
+                password: "password123",
+                userData: {
+                    phone: "+1234567890",
+                    acceptMarketing: false,
+                    role: "user"
+                }
+            };
+
+            console.log("Testing registration with data:", testData);
+
+            try {
+                const response = await fetch('https://kise-api-service1.onrender.com/api/send-verification-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(testData)
+                });
+
+                console.log("Response status:", response.status);
+                const result = await response.text();
+                console.log("Response:", result);
+
+                document.getElementById('result').innerHTML = `
+                    <h3>Result:</h3>
+                    <p>Status: ${response.status}</p>
+                    <p>Response: ${result}</p>
+                `;
+            } catch (error) {
+                console.error("Error:", error);
+                document.getElementById('result').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
