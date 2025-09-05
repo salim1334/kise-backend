@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
+const multer = require('multer');
 require('dotenv').config();
 
 const app = express();
@@ -26,6 +27,28 @@ app.use(
 );
 
 app.use(express.json());
+
+// Configure multer for file uploads
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept only PDF, JPG, PNG files
+    if (
+      file.mimetype === 'application/pdf' ||
+      file.mimetype === 'image/jpeg' ||
+      file.mimetype === 'image/jpg' ||
+      file.mimetype === 'image/png'
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only PDF, JPG, and PNG files are allowed.'));
+    }
+  },
+});
 
 // Handle CORS preflight requests
 app.options('*', cors());
@@ -512,21 +535,79 @@ app.post('/api/send-verification-email-admin', async (req, res) => {
       return res.status(403).json({ error: 'Invalid admin registration key' });
     }
 
+    // Validate role - now includes 'agent'
+    const validRoles = ['admin', 'manager', 'loan_officer', 'agent'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ error: 'Invalid role specified' });
+    }
+
+    // Generate reference ID for agents
+    let referenceId = '';
+    if (role === 'agent') {
+      try {
+        // Simulate reference ID generation logic
+        referenceId = `AGT${Math.floor(100 + Math.random() * 900)}`;
+        console.log(`🏪 Generated agent reference ID: ${referenceId}`);
+      } catch (error) {
+        console.error('Error generating agent reference ID:', error);
+        return res
+          .status(500)
+          .json({ error: 'Failed to generate agent reference ID' });
+      }
+    }
+
+    console.log(
+      `🔐 Processing admin verification email for: ${email} (Role: ${role}${
+        referenceId ? `, Ref: ${referenceId}` : ''
+      })`
+    );
+
+    // Create verification token with admin role
+    // For simplicity, token is a random string here
     const token =
       Math.random().toString(36).substring(2, 15) +
       Math.random().toString(36).substring(2, 15);
+
     const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL || 'https://kise-test.web.app';
     const verificationUrl = `${baseUrl}/verify-email-admin?token=${token}`;
 
-    await sendVerificationEmail(email, firstName, verificationUrl);
+    // Use specialized email sending function for admin verification
+    // For now, reuse sendVerificationEmail but log role and referenceId
+    try {
+      console.log(
+        `Sending admin verification email to ${email} with role ${role} and referenceId ${referenceId}`
+      );
+      await sendVerificationEmail(email, firstName, verificationUrl);
+      console.log('✅ Admin verification email sent successfully');
 
-    res.json({
-      success: true,
-      message: 'Admin verification email sent successfully',
-      verificationUrl:
-        process.env.NODE_ENV === 'development' ? verificationUrl : undefined,
-    });
+      res.json({
+        success: true,
+        message: `Admin verification email sent successfully for role: ${role}${
+          referenceId ? ` (Agent ID: ${referenceId})` : ''
+        }`,
+        emailSent: true,
+        ...(referenceId && { agentReferenceId: referenceId }),
+        verificationUrl:
+          process.env.NODE_ENV === 'development' ? verificationUrl : undefined,
+      });
+    } catch (emailError) {
+      console.error('❌ Admin email sending failed:', emailError);
+      console.log('🔗 Use this verification URL instead:', verificationUrl);
+
+      // Return success with console URL when email fails
+      res.json({
+        success: true,
+        emailSent: false,
+        message: 'Admin verification token created successfully',
+        warning:
+          'Email sending failed due to SMTP timeout. Use the console verification URL below.',
+        verificationUrl,
+        ...(referenceId && { agentReferenceId: referenceId }),
+        instructions:
+          'Copy the URL above and paste it in your browser to complete admin verification.',
+      });
+    }
   } catch (error) {
     console.error('Send admin verification email error:', error);
     res.status(500).json({ error: 'Failed to send admin verification email' });
@@ -973,20 +1054,68 @@ app.post('/api/upload-profile-image', async (req, res) => {
   }
 });
 
-// Upload KYC documents endpoint (mock)
-app.post('/api/upload-kyc-documents', async (req, res) => {
+// Upload KYC documents endpoint
+app.post('/api/upload-kyc-documents', upload.array('documents', 10), async (req, res) => {
   try {
-    const { userId, documents } = req.body;
-    if (!userId || !documents) {
-      return res
-        .status(400)
-        .json({ error: 'UserId and documents are required' });
+    // Get userId from headers or body
+    const userId = req.headers['x-user-id'] || req.body.userId;
+    if (!userId) {
+      return res.status(400).json({ error: 'UserId is required' });
     }
+
+    // Check if files were uploaded
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
+    }
+
+    const files = req.files;
+    const uploadedFiles = [];
+
+    // Process uploaded files
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileId = `file_${Date.now()}_${i}`;
+      const fileName = `${fileId}_${file.originalname}`;
+
+      // Upload to Firebase Storage
+      const bucket = admin.storage().bucket();
+      const fileRef = bucket.file(`kyc-documents/${userId}/${fileName}`);
+
+      await fileRef.save(file.buffer, {
+        metadata: {
+          contentType: file.mimetype,
+          metadata: {
+            originalName: file.originalname,
+            uploadedBy: userId,
+            uploadedAt: new Date().toISOString(),
+          },
+        },
+        public: true,
+      });
+
+      // Get the public URL
+      const fileUrl = `https://storage.googleapis.com/${bucket.name}/kyc-documents/${userId}/${fileName}`;
+
+      uploadedFiles.push({
+        id: fileId,
+        name: file.originalname,
+        type: file.mimetype,
+        size: file.size,
+        url: fileUrl,
+        uploadedAt: new Date().toISOString(),
+        verified: false,
+      });
+    }
+
+    console.log(
+      `📁 Uploaded ${uploadedFiles.length} KYC documents for user ${userId}`
+    );
 
     res.json({
       success: true,
       message: 'KYC documents uploaded successfully',
-      documentsCount: documents.length,
+      files: uploadedFiles,
+      count: uploadedFiles.length,
       userId,
     });
   } catch (error) {
