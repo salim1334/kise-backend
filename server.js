@@ -107,15 +107,15 @@ const transporter = nodemailer.createTransport({
   port: 587,
   secure: false,
   auth: {
-    user: process.env.GMAIL_USER || 'seadahassen459@gmail.com',
-    pass: process.env.GMAIL_PASS || 'haqm lfor zmxr jtxe',
+    user: process.env.GMAIL_USER || 'kisemfsocials@gmail.com',
+    pass: process.env.GMAIL_PASS || 'iyyp dobl ehco ftlz',
   },
 });
 
 // Helper function to send verification email
 async function sendVerificationEmail(email, firstName, verificationUrl) {
   const emailTemplate = {
-    from: 'seadahassen459@gmail.com',
+    from: 'kisemfsocials@gmail.com',
     to: email,
     subject: 'Verify Your Email - KiseTrust',
     html: `
@@ -193,7 +193,7 @@ async function sendKYCNotificationEmail(
   }
 
   return await transporter.sendMail({
-    from: 'seadahassen459@gmail.com',
+    from: 'kisemfsocials@gmail.com',
     to: email,
     subject,
     html,
@@ -285,7 +285,7 @@ async function sendLoanNotificationEmail(
   }
 
   return await transporter.sendMail({
-    from: 'seadahassen459@gmail.com',
+    from: 'kisemfsocials@gmail.com',
     to: email,
     subject,
     html,
@@ -296,7 +296,7 @@ async function sendLoanNotificationEmail(
 // Helper function to send welcome email
 async function sendWelcomeEmail(email, firstName) {
   const emailTemplate = {
-    from: 'seadahassen459@gmail.com',
+    from: 'kisemfsocials@gmail.com',
     to: email,
     subject: '🎉 Welcome to KiseTrust Express!',
     html: `
@@ -633,7 +633,7 @@ app.post('/api/send-password-reset', async (req, res) => {
     const resetLink = await admin.auth().generatePasswordResetLink(email);
 
     const emailTemplate = {
-      from: 'seadahassen459@gmail.com',
+      from: 'kisemfsocials@gmail.com',
       to: email,
       subject: 'Password Reset - KiseTrust',
       html: `
@@ -1313,7 +1313,7 @@ app.post('/api/test-email', async (req, res) => {
 
     // Send a test email
     await transporter.sendMail({
-      from: 'seadahassen459@gmail.com',
+      from: 'kisemfsocials@gmail.com',
       to: email,
       subject: '🧪 Test Email - KiseTrust API Service',
       html: `
@@ -1336,6 +1336,663 @@ app.post('/api/test-email', async (req, res) => {
   } catch (error) {
     console.error('Test email error:', error);
     res.status(500).json({ error: 'Failed to send test email' });
+  }
+});
+
+// ================================
+// COMPREHENSIVE NOTIFICATION SYSTEM
+// ================================
+
+// Enhanced KYC notifications endpoint with Firestore integration
+app.post('/api/kyc-notifications', async (req, res) => {
+  try {
+    const { type, userId, reviewNotes } = req.body;
+
+    if (!type || !userId) {
+      return res.status(400).json({ error: 'Type and userId are required' });
+    }
+
+    console.log(
+      `📧 Sending ${type} KYC email notification for user: ${userId}`
+    );
+
+    // Fetch user data from Firestore
+    const db = admin.firestore();
+    const userDoc = await db.collection('users').doc(userId).get();
+
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userDoc.data();
+    const userEmail = user.email;
+    const userName =
+      `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User';
+
+    if (!userEmail) {
+      return res.status(400).json({ error: 'User email not found' });
+    }
+
+    // Send email based on type
+    try {
+      await sendKYCNotificationEmail(userEmail, userName, type, reviewNotes);
+
+      console.log(`✅ ${type} KYC email sent successfully to ${userEmail}`);
+      return res.json({ success: true });
+    } catch (emailError) {
+      console.error(`❌ Failed to send ${type} KYC email:`, emailError);
+      return res.json({
+        success: false,
+        error: 'Email sending failed',
+        details: emailError.message,
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error in KYC notifications API:', error);
+    return res.status(500).json({
+      error: 'Failed to process KYC notification',
+      details: error.message,
+    });
+  }
+});
+
+// Enhanced Loan notifications endpoint with comprehensive functionality
+app.post('/api/loan-notifications', async (req, res) => {
+  try {
+    const { type, applicationId, userId, reviewNotes } = req.body;
+
+    if (!type || !applicationId || !userId) {
+      return res.status(400).json({
+        error: 'Type, applicationId, and userId are required',
+      });
+    }
+
+    console.log(
+      `📧 Processing ${type} loan notification for application: ${applicationId}`
+    );
+
+    const db = admin.firestore();
+
+    // Get user details
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userDoc.data();
+    if (!user || !user.email) {
+      return res.status(404).json({ error: 'User email not available' });
+    }
+
+    // Get application details
+    const applicationDoc = await db
+      .collection('loanApplications')
+      .doc(applicationId)
+      .get();
+    if (!applicationDoc.exists) {
+      return res.status(404).json({ error: 'Loan application not found' });
+    }
+
+    const application = applicationDoc.data();
+    const userName = user.firstName || user.name || 'Valued Customer';
+
+    let additionalData = {};
+
+    if (type === 'approved') {
+      const interestRate = application.loanType === 'emergency' ? 20 : 15;
+      const monthlyRate = interestRate / 100 / 12;
+      const monthlyPayment =
+        (application.amount *
+          monthlyRate *
+          Math.pow(1 + monthlyRate, application.term)) /
+        (Math.pow(1 + monthlyRate, application.term) - 1);
+
+      additionalData = { interestRate, term: application.term, monthlyPayment };
+    } else if (type === 'rejected') {
+      additionalData = {
+        reviewNotes:
+          reviewNotes || 'Application did not meet our current criteria',
+      };
+    }
+
+    try {
+      await sendLoanNotificationEmail(
+        user.email,
+        userName,
+        type,
+        applicationId,
+        application.loanType,
+        application.amount,
+        additionalData
+      );
+
+      console.log(`✅ ${type} email notification sent successfully`);
+      return res.json({
+        success: true,
+        message: 'Email notification sent successfully',
+      });
+    } catch (emailError) {
+      console.error(`❌ Email sending failed for ${type}:`, emailError);
+      return res.json({
+        success: true,
+        message: 'Loan notification processed successfully',
+        warning: 'Email sending failed, but notification was processed',
+        error: emailError.message,
+      });
+    }
+  } catch (error) {
+    console.error('❌ Loan notification API error:', error);
+    return res.status(500).json({
+      error: 'Failed to process loan notification request',
+      details: error.message,
+    });
+  }
+});
+
+// Enhanced Share notifications endpoint
+app.post('/api/share-notifications', async (req, res) => {
+  try {
+    const {
+      type,
+      transactionId,
+      userId,
+      shares,
+      amount,
+      purchaseDate,
+      rejectionReason,
+    } = req.body;
+
+    if (!type || !userId) {
+      return res.status(400).json({ error: 'Type and userId are required' });
+    }
+
+    console.log(
+      `📧 Processing ${type} share notification for transaction: ${transactionId}`
+    );
+
+    const db = admin.firestore();
+
+    // Get user details
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userDoc.data();
+    if (!user || !user.email) {
+      return res.status(404).json({ error: 'User email not available' });
+    }
+
+    try {
+      const investorName = user.firstName || user.name || 'Valued Investor';
+      const purchaseDateObj = purchaseDate
+        ? new Date(purchaseDate)
+        : new Date();
+
+      // For now, we'll use the basic email system since SharesEmailService isn't available
+      // In production, you'd integrate the SharesEmailService here
+      let subject, html;
+
+      switch (type) {
+        case 'pending':
+          subject = '⏳ Share Purchase Pending';
+          html = `<h2>Share Purchase Submitted</h2>
+                  <p>Hello ${investorName},</p>
+                  <p>Your purchase of ${shares} shares for ${amount} ETB is being processed.</p>
+                  <p>Transaction ID: ${transactionId}</p>`;
+          break;
+        case 'confirmed':
+          subject = '🎉 Share Purchase Confirmed';
+          html = `<h2>Share Purchase Confirmed</h2>
+                  <p>Hello ${investorName},</p>
+                  <p>Your purchase of ${shares} shares for ${amount} ETB has been confirmed!</p>
+                  <p>Transaction ID: ${transactionId}</p>`;
+          break;
+        case 'rejected':
+          subject = '❌ Share Purchase Rejected';
+          html = `<h2>Share Purchase Rejected</h2>
+                  <p>Hello ${investorName},</p>
+                  <p>Your share purchase has been rejected.</p>
+                  <p>Reason: ${
+                    rejectionReason || 'Payment verification failed'
+                  }</p>`;
+          break;
+      }
+
+      await transporter.sendMail({
+        from: 'seadahassen459@gmail.com',
+        to: user.email,
+        subject,
+        html,
+      });
+
+      console.log(`✅ ${type} share email sent successfully to ${user.email}`);
+      return res.json({ success: true });
+    } catch (emailError) {
+      console.error(`❌ Failed to send ${type} share email:`, emailError);
+      return res.json({
+        success: false,
+        error: 'Email sending failed',
+        details: emailError.message,
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error in share notifications API:', error);
+    return res.status(500).json({
+      error: 'Failed to process share notification',
+      details: error.message,
+    });
+  }
+});
+
+// ================================
+// ADMIN ENDPOINTS
+// ================================
+
+// Admin KYC Approve endpoint
+app.post('/api/admin/kyc/approve', async (req, res) => {
+  try {
+    const { userId, reviewNotes } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    console.log(`🔄 Attempting to approve KYC for user: ${userId}`);
+
+    const db = admin.firestore();
+
+    // Update user KYC status
+    try {
+      await db.collection('users').doc(userId).update({
+        kycStatus: 'verified',
+        accountStatus: 'active',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      console.log(`✅ User ${userId} KYC status updated successfully`);
+    } catch (updateError) {
+      console.error('❌ Error updating user:', updateError);
+      return res.status(500).json({
+        error: 'Failed to update user KYC status',
+        details: updateError.message,
+      });
+    }
+
+    // Create notification for user
+    try {
+      await db.collection('notifications').add({
+        userId: userId,
+        title: 'KYC Approved! 🎉',
+        message:
+          'Your KYC verification has been approved. You can now access all platform features.',
+        type: 'success',
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      console.log(`✅ Notification created for user ${userId}`);
+    } catch (notificationError) {
+      console.error('❌ Error creating notification:', notificationError);
+      // Don't fail the approval if notification fails
+    }
+
+    // Send email notification
+    try {
+      await fetch(
+        `${
+          process.env.API_URL || 'http://localhost:3000'
+        }/api/kyc-notifications`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'approved', userId, reviewNotes }),
+        }
+      );
+    } catch (emailError) {
+      console.error('❌ Error sending approval email:', emailError);
+    }
+
+    return res.json({
+      success: true,
+      message: 'KYC approved successfully',
+      userId,
+      approvedAt: new Date(),
+    });
+  } catch (error) {
+    console.error('❌ Error approving KYC:', error);
+    return res.status(500).json({
+      error: 'Failed to approve KYC',
+      details: error.message,
+    });
+  }
+});
+
+// Admin KYC Reject endpoint
+app.post('/api/admin/kyc/reject', async (req, res) => {
+  try {
+    const { userId, reviewNotes } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    console.log(`🔄 Attempting to reject KYC for user: ${userId}`);
+
+    const db = admin.firestore();
+
+    // Update user KYC status
+    await db.collection('users').doc(userId).update({
+      kycStatus: 'rejected',
+      accountStatus: 'pending_verification',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Create notification for user
+    await db.collection('notifications').add({
+      userId: userId,
+      title: 'KYC Application Rejected',
+      message: `Your KYC application has been rejected. ${
+        reviewNotes
+          ? `Reason: ${reviewNotes}`
+          : 'Please review your information and try again.'
+      }`,
+      type: 'error',
+      read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Send email notification
+    try {
+      await fetch(
+        `${
+          process.env.API_URL || 'http://localhost:3000'
+        }/api/kyc-notifications`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'rejected', userId, reviewNotes }),
+        }
+      );
+    } catch (emailError) {
+      console.error('❌ Error sending rejection email:', emailError);
+    }
+
+    console.log(`❌ KYC rejected for user ${userId}`);
+    if (reviewNotes) {
+      console.log(`📝 Rejection reason: ${reviewNotes}`);
+    }
+
+    return res.json({
+      success: true,
+      message: 'KYC rejected successfully',
+      userId,
+      rejectedAt: new Date(),
+    });
+  } catch (error) {
+    console.error('❌ Error rejecting KYC:', error);
+    return res.status(500).json({
+      error: 'Failed to reject KYC',
+      details: error.message,
+    });
+  }
+});
+
+// Admin KYC Request Info endpoint
+app.post('/api/admin/kyc/request-info', async (req, res) => {
+  try {
+    const { userId, requestedInfo, reviewNotes } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    console.log(`🔄 Attempting to request more info for user: ${userId}`);
+
+    const db = admin.firestore();
+
+    // Update user KYC status
+    await db.collection('users').doc(userId).update({
+      kycStatus: 'incomplete',
+      accountStatus: 'pending_verification',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Create notification for user
+    await db.collection('notifications').add({
+      userId: userId,
+      title: 'Additional Information Required',
+      message: `Your KYC application requires additional information. ${
+        requestedInfo ||
+        reviewNotes ||
+        'Please provide the requested documents and information.'
+      }`,
+      type: 'warning',
+      read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Send email notification
+    try {
+      await fetch(
+        `${
+          process.env.API_URL || 'http://localhost:3000'
+        }/api/kyc-notifications`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'additional_info',
+            userId,
+            reviewNotes: requestedInfo || reviewNotes,
+          }),
+        }
+      );
+    } catch (emailError) {
+      console.error('❌ Error sending info request email:', emailError);
+    }
+
+    console.log(`⚠️ Additional info requested for user ${userId}`);
+    if (requestedInfo || reviewNotes) {
+      console.log(`📝 Requested info: ${requestedInfo || reviewNotes}`);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Additional information requested successfully',
+      userId,
+      requestedAt: new Date(),
+    });
+  } catch (error) {
+    console.error('❌ Error requesting additional info:', error);
+    return res.status(500).json({
+      error: 'Failed to request additional information',
+      details: error.message,
+    });
+  }
+});
+
+// Admin Loan Approve endpoint
+app.post('/api/admin/loans/approve', async (req, res) => {
+  try {
+    const {
+      applicationId,
+      approvedAmount,
+      approvedTerm,
+      approvedInterestRate,
+      reviewNotes,
+    } = req.body;
+
+    if (
+      !applicationId ||
+      !approvedAmount ||
+      !approvedTerm ||
+      !approvedInterestRate
+    ) {
+      return res.status(400).json({
+        error:
+          'Application ID, approved amount, term, and interest rate are required',
+      });
+    }
+
+    const db = admin.firestore();
+
+    // Get the loan application
+    const applicationDoc = await db
+      .collection('loanApplications')
+      .doc(applicationId)
+      .get();
+    if (!applicationDoc.exists) {
+      return res.status(404).json({ error: 'Loan application not found' });
+    }
+
+    const application = applicationDoc.data();
+
+    // Update loan application status
+    await db.collection('loanApplications').doc(applicationId).update({
+      status: 'approved',
+      approvedAmount,
+      approvedTerm,
+      approvedInterestRate,
+      reviewNotes,
+      approvedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Create notification for user
+    await db.collection('notifications').add({
+      userId: application.userId,
+      title: 'Loan Application Approved! 🎉',
+      message: `Your ${
+        application.loanType
+      } loan application for ${approvedAmount.toLocaleString()} ETB has been approved. The funds will be disbursed shortly.`,
+      type: 'success',
+      read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Send email notification
+    try {
+      await fetch(
+        `${
+          process.env.API_URL || 'http://localhost:3000'
+        }/api/loan-notifications`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'approved',
+            applicationId,
+            userId: application.userId,
+            reviewNotes,
+          }),
+        }
+      );
+    } catch (emailError) {
+      console.error('❌ Error sending approval email:', emailError);
+    }
+
+    console.log(`✅ Loan approved for application ${applicationId}`);
+    console.log(`💰 Approved amount: ${approvedAmount} ETB`);
+    console.log(`📅 Term: ${approvedTerm} months`);
+    console.log(`📊 Interest rate: ${approvedInterestRate}%`);
+
+    return res.json({
+      success: true,
+      message: 'Loan application approved successfully',
+      applicationId,
+      approvedAt: new Date(),
+      approvedAmount,
+      approvedTerm,
+      approvedInterestRate,
+    });
+  } catch (error) {
+    console.error('❌ Error approving loan:', error);
+    return res.status(500).json({
+      error: 'Failed to approve loan application',
+      details: error.message,
+    });
+  }
+});
+
+// Admin Loan Reject endpoint
+app.post('/api/admin/loans/reject', async (req, res) => {
+  try {
+    const { applicationId, rejectionReason, reviewNotes } = req.body;
+
+    if (!applicationId || !rejectionReason) {
+      return res.status(400).json({
+        error: 'Application ID and rejection reason are required',
+      });
+    }
+
+    const db = admin.firestore();
+
+    // Get the loan application
+    const applicationDoc = await db
+      .collection('loanApplications')
+      .doc(applicationId)
+      .get();
+    if (!applicationDoc.exists) {
+      return res.status(404).json({ error: 'Loan application not found' });
+    }
+
+    const application = applicationDoc.data();
+
+    // Update loan application status
+    await db.collection('loanApplications').doc(applicationId).update({
+      status: 'rejected',
+      rejectionReason,
+      reviewNotes,
+      rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Create notification for user
+    await db.collection('notifications').add({
+      userId: application.userId,
+      title: 'Loan Application Rejected',
+      message: `Your ${application.loanType} loan application has been rejected. Reason: ${rejectionReason}. You may reapply after addressing the concerns.`,
+      type: 'error',
+      read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Send email notification
+    try {
+      await fetch(
+        `${
+          process.env.API_URL || 'http://localhost:3000'
+        }/api/loan-notifications`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'rejected',
+            applicationId,
+            userId: application.userId,
+            reviewNotes: rejectionReason,
+          }),
+        }
+      );
+    } catch (emailError) {
+      console.error('❌ Error sending rejection email:', emailError);
+    }
+
+    console.log(`❌ Loan rejected for application ${applicationId}`);
+    console.log(`📝 Rejection reason: ${rejectionReason}`);
+
+    return res.json({
+      success: true,
+      message: 'Loan application rejected successfully',
+      applicationId,
+      rejectedAt: new Date(),
+      rejectionReason,
+    });
+  } catch (error) {
+    console.error('❌ Error rejecting loan:', error);
+    return res.status(500).json({
+      error: 'Failed to reject loan application',
+      details: error.message,
+    });
   }
 });
 
