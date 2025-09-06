@@ -1586,6 +1586,159 @@ app.post('/api/share-notifications', async (req, res) => {
 });
 
 // ================================
+// AGENT NOTIFICATION SYSTEM
+// ================================
+
+// Agent notification endpoint for share purchases
+app.post('/api/agent-notifications', async (req, res) => {
+  try {
+    const { agentRefId, transactionId, userId, shares, amount, investorName } =
+      req.body;
+
+    if (!agentRefId || !transactionId || !userId || !shares || !amount) {
+      return res.status(400).json({
+        error:
+          'agentRefId, transactionId, userId, shares, and amount are required',
+      });
+    }
+
+    console.log(
+      `📧 Sending agent notification for share purchase: ${transactionId}`
+    );
+
+    const db = admin.firestore();
+
+    // Find the agent by reference ID
+    const agentsQuery = await db
+      .collection('users')
+      .where('role', '==', 'agent')
+      .where('agentReferenceId', '==', agentRefId)
+      .limit(1)
+      .get();
+
+    if (agentsQuery.empty) {
+      console.log(`⚠️ Agent not found for reference ID: ${agentRefId}`);
+      return res.json({
+        success: false,
+        message: 'Agent not found',
+        agentRefId,
+      });
+    }
+
+    const agentDoc = agentsQuery.docs[0];
+    const agent = agentDoc.data();
+    const agentEmail = agent.email;
+    const agentName =
+      `${agent.firstName || ''} ${agent.lastName || ''}`.trim() || 'Agent';
+
+    if (!agentEmail) {
+      return res.status(400).json({ error: 'Agent email not found' });
+    }
+
+    // Calculate commission (2% of transaction amount)
+    const commission = amount * 0.02;
+
+    try {
+      // Send agent notification email
+      const subject = '🎉 New Share Purchase - Commission Earned!';
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="margin: 0; font-size: 24px;">🎉 New Share Purchase!</h1>
+            <p style="margin: 10px 0 0 0; font-size: 16px;">You've earned a commission</p>
+          </div>
+          
+          <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+            <h2 style="color: #333; margin-top: 0;">Hello ${agentName}!</h2>
+            
+            <p style="color: #555; line-height: 1.6;">
+              Great news! Someone has purchased shares using your agent reference ID. 
+              You've earned a commission on this transaction.
+            </p>
+            
+            <div style="background: #e8f5e8; border: 1px solid #4caf50; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="color: #2e7d32; margin-top: 0;">💰 Transaction Details</h3>
+              <div style="color: #2e7d32; line-height: 1.6;">
+                <p><strong>Investor:</strong> ${investorName || 'Anonymous'}</p>
+                <p><strong>Shares Purchased:</strong> ${shares.toLocaleString()}</p>
+                <p><strong>Transaction Amount:</strong> ETB ${amount.toLocaleString()}</p>
+                <p><strong>Your Commission (2%):</strong> ETB ${commission.toLocaleString()}</p>
+                <p><strong>Transaction ID:</strong> ${transactionId}</p>
+                <p><strong>Your Agent ID:</strong> ${agentRefId}</p>
+              </div>
+            </div>
+            
+            <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="color: #856404; margin-top: 0;">📊 Commission Information</h3>
+              <p style="color: #856404; line-height: 1.6;">
+                Your commission will be processed and added to your agent account within 1-2 business days. 
+                Keep up the great work!
+              </p>
+            </div>
+            
+            <p style="color: #333; margin-top: 30px;">
+              Best regards,<br>
+              <strong>The KiseTrust Investment Team</strong>
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin-top: 20px; color: #666; font-size: 12px;">
+            <p>© 2024 KiseTrust Express. All rights reserved.</p>
+          </div>
+        </div>
+      `;
+
+      await transporter.sendMail({
+        from: 'seadahassen459@gmail.com',
+        to: agentEmail,
+        subject,
+        html,
+        text: html.replace(/<[^>]*>/g, ''),
+      });
+
+      // Create notification for agent
+      await db.collection('notifications').add({
+        userId: agentDoc.id,
+        title: 'Commission Earned! 🎉',
+        message: `You earned ETB ${commission.toLocaleString()} commission from a share purchase (${shares} shares)`,
+        type: 'success',
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        data: {
+          transactionId,
+          shares,
+          amount,
+          commission,
+          agentRefId,
+        },
+      });
+
+      console.log(`✅ Agent notification sent successfully to ${agentEmail}`);
+      return res.json({
+        success: true,
+        message: 'Agent notification sent successfully',
+        agentEmail,
+        agentName,
+        commission,
+      });
+    } catch (emailError) {
+      console.error(`❌ Failed to send agent notification:`, emailError);
+      return res.json({
+        success: false,
+        error: 'Email sending failed',
+        details: emailError.message,
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error in agent notifications API:', error);
+    return res.status(500).json({
+      error: 'Failed to process agent notification',
+      details: error.message,
+    });
+  }
+});
+
+// ================================
 // ADMIN ENDPOINTS
 // ================================
 
@@ -1991,6 +2144,198 @@ app.post('/api/admin/loans/reject', async (req, res) => {
     console.error('❌ Error rejecting loan:', error);
     return res.status(500).json({
       error: 'Failed to reject loan application',
+      details: error.message,
+    });
+  }
+});
+
+// Admin Share Approval/Rejection Endpoints
+
+// Admin Share Approve endpoint
+app.post('/api/admin/shares/approve', async (req, res) => {
+  try {
+    const { transactionId, reviewNotes } = req.body;
+
+    if (!transactionId) {
+      return res.status(400).json({ error: 'Transaction ID is required' });
+    }
+
+    console.log(`🔄 Approving share purchase: ${transactionId}`);
+
+    const db = admin.firestore();
+
+    // Get the transaction
+    const transactionDoc = await db
+      .collection('investmentTransactions')
+      .doc(transactionId)
+      .get();
+    if (!transactionDoc.exists) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    const transaction = transactionDoc.data();
+
+    // Update transaction status
+    await db
+      .collection('investmentTransactions')
+      .doc(transactionId)
+      .update({
+        status: 'confirmed',
+        approvedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        reviewNotes: reviewNotes || 'Share purchase approved',
+      });
+
+    // Update user's investment record
+    const investmentQuery = await db
+      .collection('investments')
+      .where('userId', '==', transaction.userId)
+      .limit(1)
+      .get();
+
+    if (!investmentQuery.empty) {
+      const investmentDoc = investmentQuery.docs[0];
+      await investmentDoc.ref.update({
+        totalShares: admin.firestore.FieldValue.increment(transaction.shares),
+        totalPaid: admin.firestore.FieldValue.increment(transaction.amount),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    // Create notification for user
+    await db.collection('notifications').add({
+      userId: transaction.userId,
+      title: 'Share Purchase Confirmed! ',
+      message: `Your purchase of ${
+        transaction.shares
+      } shares for ETB ${transaction.amount.toLocaleString()} has been confirmed.`,
+      type: 'success',
+      read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Send confirmation email notification
+    try {
+      await fetch(
+        `${
+          process.env.API_URL || 'http://localhost:3000'
+        }/api/share-notifications`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'confirmed',
+            transactionId: transactionId,
+            userId: transaction.userId,
+            shares: transaction.shares,
+            amount: transaction.amount,
+            purchaseDate: transaction.createdAt,
+          }),
+        }
+      );
+    } catch (emailError) {
+      console.error('❌ Error sending confirmation email:', emailError);
+    }
+
+    console.log(`✅ Share purchase approved: ${transactionId}`);
+    return res.json({
+      success: true,
+      message: 'Share purchase approved successfully',
+      transactionId,
+      approvedAt: new Date(),
+    });
+  } catch (error) {
+    console.error('❌ Error approving share purchase:', error);
+    return res.status(500).json({
+      error: 'Failed to approve share purchase',
+      details: error.message,
+    });
+  }
+});
+
+// Admin Share Reject endpoint
+app.post('/api/admin/shares/reject', async (req, res) => {
+  try {
+    const { transactionId, rejectionReason, reviewNotes } = req.body;
+
+    if (!transactionId || !rejectionReason) {
+      return res.status(400).json({
+        error: 'Transaction ID and rejection reason are required',
+      });
+    }
+
+    console.log(`🔄 Rejecting share purchase: ${transactionId}`);
+
+    const db = admin.firestore();
+
+    // Get the transaction
+    const transactionDoc = await db
+      .collection('investmentTransactions')
+      .doc(transactionId)
+      .get();
+    if (!transactionDoc.exists) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    const transaction = transactionDoc.data();
+
+    // Update transaction status
+    await db
+      .collection('investmentTransactions')
+      .doc(transactionId)
+      .update({
+        status: 'rejected',
+        rejectionReason: rejectionReason,
+        reviewNotes: reviewNotes || rejectionReason,
+        rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+    // Create notification for user
+    await db.collection('notifications').add({
+      userId: transaction.userId,
+      title: 'Share Purchase Rejected',
+      message: `Your share purchase has been rejected. Reason: ${rejectionReason}`,
+      type: 'error',
+      read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Send rejection email notification
+    try {
+      await fetch(
+        `${
+          process.env.API_URL || 'http://localhost:3000'
+        }/api/share-notifications`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'rejected',
+            transactionId: transactionId,
+            userId: transaction.userId,
+            shares: transaction.shares,
+            amount: transaction.amount,
+            rejectionReason: rejectionReason,
+          }),
+        }
+      );
+    } catch (emailError) {
+      console.error('❌ Error sending rejection email:', emailError);
+    }
+
+    console.log(`❌ Share purchase rejected: ${transactionId}`);
+    return res.json({
+      success: true,
+      message: 'Share purchase rejected successfully',
+      transactionId,
+      rejectedAt: new Date(),
+      rejectionReason,
+    });
+  } catch (error) {
+    console.error('❌ Error rejecting share purchase:', error);
+    return res.status(500).json({
+      error: 'Failed to reject share purchase',
       details: error.message,
     });
   }
